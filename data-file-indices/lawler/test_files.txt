@@ -1,0 +1,4 @@
+IndividualData/lawler-data/10.10/10.10.shm
+IndividualData/lawler-data/10.12/10.12.shm
+IndividualData/lawler-data/10.14/10.14.shm
+IndividualData/lawler-data/10.16/10.16.shm
