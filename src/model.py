@@ -9,7 +9,7 @@ class Discriminator_BN_Bias(nn.Module):
         super(Discriminator_BN_Bias, self).__init__()
         
         # (input_shape[0], input_shape[1] )=  (number of data point, 6 axis channel )
-        in_channels, win_size = input_shape[0], input_shape[1]
+        win_size,in_channels = input_shape[0], input_shape[1]
         self.in_channels = in_channels
         self.ngpu = ngpu  
         self.out_fea = out_fea
@@ -123,7 +123,7 @@ class Discriminator_ResNet(nn.Module):
         super(Discriminator_ResNet, self).__init__()
         
         # (input_shape[0], input_shape[1] )=  (number of data point, 6 axis channel )
-        in_channels, win_size = input_shape[0], input_shape[1]
+        win_size, in_channels= input_shape[0], input_shape[1]
         self.in_channels = in_channels
         self.ngpu = ngpu  
         self.out_fea = out_fea
@@ -191,5 +191,85 @@ class Discriminator_ResNet(nn.Module):
             
         x = self.relu2(self.linear1(x))
         out = self.linear2(x)
+
+        return out
+    
+    
+from torch import nn
+class Discriminator(nn.Module):
+    def __init__(self, ngpu, input_shape , out_fea = 1, device="cpu"):
+        super(Discriminator, self).__init__()
+        self.device =device
+        # (input_shape[0], input_shape[1] )=  (number of data point, 6 axis channel )
+        win_size, in_channels = input_shape[0], input_shape[1]
+        self.in_channels = in_channels
+        self.ngpu = ngpu  
+        self.out_fea = out_fea
+        filter_size = 10
+        self.conv0 = nn.Conv1d(in_channels = self.in_channels, 
+                               out_channels = filter_size, 
+                               kernel_size= 44,  stride= 2, padding=0, bias=False)
+        
+        self.relu0= nn.ReLU()
+        
+        self.conv1 = nn.Conv1d(filter_size,filter_size, kernel_size= 20,stride= 2, padding=0, bias=False)
+        self.relu1= nn.ReLU()
+        
+        self.conv2 = nn.Conv1d(filter_size,filter_size, kernel_size= 4, stride= 2, padding=0, bias=False)
+        self.relu2= nn.ReLU()
+        
+#         self.conv3 = nn.Conv1d(filter_size,filter_size, kernel_size= 4, stride= 2, padding=0, bias=False)
+#         self.relu3= nn.LeakyReLU(0, inplace=True)
+        
+        self.avgpool = nn.AvgPool1d(kernel_size=10)
+        self.flatten = nn.Flatten()
+        self.linear1 = None 
+        self.relu4 = nn.ReLU()
+        self.linear2 = nn.Linear(in_features=200, out_features=out_fea, bias=True)
+        self.softmax = nn.Softmax(dim=out_fea)
+        self.sigmoid = nn.Sigmoid()
+        
+        nn.init.normal_(self.conv0.weight.data, 0.0, 1.)
+        nn.init.normal_(self.conv1.weight.data, 0.0, 1.)
+        nn.init.normal_(self.conv2.weight.data, 0.0, 1.)
+        nn.init.normal_(self.linear2.bias.data, 0.0, 1.)
+        #nn.init.normal_(self.conv0.bias.data, 0.0, 1.)
+        #nn.init.normal_(self.conv1.bias.data, 0.0, 1.)
+        #nn.init.normal_(self.conv2.bias.data, 0.0, 1.)
+#         nn.init.normal_(self.avgpool.weight.data, 0.0, 1.)
+        
+    def l1_loss(self,factor=0.01):
+        l1_crit = nn.L1Loss(size_average=False)
+        reg_loss = 0.
+        loss = 0.
+        layers = [self.conv1, self.conv2]
+        for layer in layers:
+            for p in layer.parameters():
+                #print(p)
+                reg_loss += l1_crit(p, torch.zeros(p.shape, device= self.device))
+
+        loss = factor * reg_loss
+        return loss
+
+    def forward(self, input):
+#         print("input shape:",input.shape)
+        x = input.permute(0,2,1)
+        x = self.conv0(x)
+        x = self.relu0(x)
+        x = self.conv1(x)
+        x = self.relu1(x)
+        x = self.conv2(x)
+        x = self.relu2(x)
+        x = self.avgpool(x)
+        #print("Pooling shape:",x.shape)
+        x = self.flatten(x)
+        if self.linear1 == None:
+            self.linear1 = nn.Linear(in_features=x.shape[1], out_features=200, bias=True)
+            nn.init.normal_(self.linear1.weight.data, 0.0, 1.)
+            nn.init.normal_(self.linear1.bias.data, 0.0, 1.)
+            
+        x = self.relu4(self.linear1(x))
+        out = self.linear2(x)
+#         out = self.sigmoid(x)
 
         return out

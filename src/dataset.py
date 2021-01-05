@@ -9,9 +9,10 @@ import os
 import random
 
 
+
 def create_train_test_file_list(file_name= "all_files_list.txt",person_name = 'wenkanw',
                      out_path = "../data-file-indices/",root_path= "../",
-                     test_ratio = 0.2, print_flag = True):
+                     test_ratio = 0.2, print_flag = True, shuffle=False, random_state=None):
     """
     This function is used to split test set and training set based on file names
     
@@ -67,8 +68,13 @@ def create_train_test_file_list(file_name= "all_files_list.txt",person_name = 'w
                     new_file = path.replace(root_path+"data/","")
                     new_file += "\n"
                     new_files.append(new_file)
+    if shuffle:
+        random.seed(random_state)
+        random.shuffle(new_files)
+        pass
+    else:
+        new_files.sort()
         
-    new_files.sort()
     if test_ratio > 0.:
         # split train files and test files
         test_size = int(len(new_files)*test_ratio)
@@ -253,11 +259,47 @@ class Person_MealsDataset(torch.utils.data.Dataset):
         del axdata
         del aydata
         return subsetData, subsetLabels
+    
+    def get_mealdataset_info(self,person_name = "wenkanw",file_ls = [], root_path = "../data/",print_file=False):
+        """
+        if file_ls is not given, then get file_ls according to person_name
+        file path = root_path + file name in all_files_list.txt
+
+        return:
+            meal event count, total minutes of all meals, total hours of all meals,total day counts
+
+        """
+        if len(file_ls) ==0:
+            data_indices_file = "../data-file-indices/" +person_name+"/all_files_list.txt"
+            fp = open(data_indices_file,"r")
+            txt = fp.read()
+            fp.close()
+            file_ls = txt.split("\n")
+            while '' in file_ls:
+                file_ls.remove('')
+
+        meal_counts = 0
+        sec_counts = 0
+        min_counts = 0
+        hour_counts = 0
+        day_counts = len(file_ls)
+        for file_name in file_ls:
+            file_name = root_path + file_name
+            TotalEvents, EventStart, EventEnd, EventNames, TimeOffset = loadEvents(file_name, debug_flag = False, print_file=print_file)
+            meal_counts += TotalEvents
+            for i in range(len(EventStart)):
+                sec_counts += ( EventEnd[i]- EventStart[i])//(15)
+
+        min_counts = sec_counts/60
+        hour_counts = min_counts/60
+        return meal_counts, min_counts,hour_counts, day_counts
+
+
         
         
             
                 
-def balance_data_indices(labels, sample_num = 4000,mode= "under", replace = False,shuffle=True, random_state = 1000):
+def balance_data_indices(labels, data_indices=None,sample_num = 4000,mode= "under", replace = False,shuffle=True, random_state = 1000):
     """
     sample_num: number of samples of each class after balancing
     mode: 
@@ -267,8 +309,13 @@ def balance_data_indices(labels, sample_num = 4000,mode= "under", replace = Fals
     return:
         balanced indices
     """
-    eat_labels_index = [i for i, e in enumerate(labels) if e >= 0.5]
-    not_eat_labels_index = [i for i, e in enumerate(labels) if e < 0.5]
+    if data_indices:
+        eat_labels_index = [data_indices[i] for i, e in enumerate(labels) if e >= 0.5]
+        not_eat_labels_index = [data_indices[i] for i, e in enumerate(labels) if e < 0.5]
+    else:
+        eat_labels_index = [i for i, e in enumerate(labels) if e >= 0.5]
+        not_eat_labels_index = [i for i, e in enumerate(labels) if e < 0.5]
+        
     eat_index = eat_labels_index
     not_eat_index = not_eat_labels_index
     if random_state != None:
@@ -278,7 +325,7 @@ def balance_data_indices(labels, sample_num = 4000,mode= "under", replace = Fals
         eat_index = np.random.choice(eat_labels_index,len(not_eat_labels_index)).tolist()
         pass
     elif mode == "under":
-        not_eat_index = np.random.choice(not_eat_labels_index,len(eat_labels_index)).tolist()
+        not_eat_index = np.random.choice(not_eat_labels_index,len(eat_labels_index),replace = replace).tolist()
         pass
     else:
         #default as mix

@@ -101,7 +101,7 @@ def smooth(RawData, WINDOW_SIZE = 15,SIG = 10.0 ):
 
 
 
-def loadEvents(filename ,debug_flag=False, root_path="../data-file-indices/CAD/"):
+def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/"):
     """
     loads events data given the .shm filename
     and parse the event.txt file to obtain meal duration
@@ -115,8 +115,8 @@ def loadEvents(filename ,debug_flag=False, root_path="../data-file-indices/CAD/"
     """
     # Load the meals file to get any triaged meals.
     SkippedMeals = []
-    
-    print("Loading File: ", filename)
+    if print_file:
+        print("Loading File: ", filename)
     mealsfile = open( root_path +"meals-shimmer.txt", "r") 
     
     for line in mealsfile:
