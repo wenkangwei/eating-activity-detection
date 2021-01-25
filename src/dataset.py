@@ -128,7 +128,8 @@ class Person_MealsDataset(torch.utils.data.Dataset):
                  ratio_dataset=1,
                 load_splitted_dataset = False,
                  enable_time_feat = False,
-                 debug_flag= False
+                 debug_flag= False,
+                 get_numpy_data= False
                 ):
         
         if file_name == "train":
@@ -140,8 +141,9 @@ class Person_MealsDataset(torch.utils.data.Dataset):
             
         # Note: file_name is the name of file that contain the list of shm files' names
         self.file_name = file_name
+        self.get_numpy_data = get_numpy_data
         self.dataset = dataset
-        
+        self.person_name = person_name
         self.winmin = winmin
         self.stridesec = stridesec
         self.load_splitted_dataset = load_splitted_dataset
@@ -186,6 +188,8 @@ class Person_MealsDataset(torch.utils.data.Dataset):
         # 3. Return a data pair (e.g. image and label).
         #这里需要注意的是，第一步：read one data，是一个data
         data = self.get_item(index)
+        if self.get_numpy_data:
+            return data['data'].numpy() ,data['label']
         return data['data'],data['label']
         
         pass
@@ -260,7 +264,28 @@ class Person_MealsDataset(torch.utils.data.Dataset):
         del aydata
         return subsetData, subsetLabels
     
-    def get_mealdataset_info(self,person_name = "wenkanw",file_ls = [], root_path = "../data/",print_file=False):
+    def get_GT_segment(self,root_path = "../data/",print_file=False):
+        file_ls = []
+        fp = open(self.file_name,"r")
+        txt = fp.read()
+        fp.close()
+        file_ls = txt.split("\n")
+        while '' in file_ls:
+            file_ls.remove('')
+        
+        start_ls = []
+        end_ls = []
+        total_events =[]
+        for file_name in file_ls:
+            file_name = root_path + file_name
+            TotalEvents, EventStart, EventEnd, EventNames, TimeOffset,EndTime = loadEvents(file_name, debug_flag = False, print_file=print_file)
+            start_ls.append(EventStart[:TotalEvents])
+            end_ls.append(EventEnd[:TotalEvents])
+            
+        return  start_ls, end_ls
+        
+        
+    def get_mealdataset_info(self,person_name = None,file_ls = [], file_ls_doc=None,root_path = "../data/",print_file=False):
         """
         if file_ls is not given, then get file_ls according to person_name
         file path = root_path + file name in all_files_list.txt
@@ -269,9 +294,14 @@ class Person_MealsDataset(torch.utils.data.Dataset):
             meal event count, total minutes of all meals, total hours of all meals,total day counts
 
         """
+        if person_name ==None:
+            person_name = self.person_name
         if len(file_ls) ==0:
-            data_indices_file = "../data-file-indices/" +person_name+"/all_files_list.txt"
-            fp = open(data_indices_file,"r")
+            if file_ls_doc != None:
+                data_indices_file = "../data-file-indices/" +person_name+"/"+ file_ls_doc
+                fp = open(data_indices_file,"r")
+            else:
+                fp = open(self.file_name,"r")
             txt = fp.read()
             fp.close()
             file_ls = txt.split("\n")
@@ -282,17 +312,24 @@ class Person_MealsDataset(torch.utils.data.Dataset):
         sec_counts = 0
         min_counts = 0
         hour_counts = 0
+        total_hours = 0
+        total_mins = 0
+        total_sec = 0
         day_counts = len(file_ls)
         for file_name in file_ls:
             file_name = root_path + file_name
-            TotalEvents, EventStart, EventEnd, EventNames, TimeOffset = loadEvents(file_name, debug_flag = False, print_file=print_file)
+            TotalEvents, EventStart, EventEnd, EventNames, TimeOffset,EndTime = loadEvents(file_name, debug_flag = False, print_file=print_file)
             meal_counts += TotalEvents
+            total_sec +=  abs(EndTime - TimeOffset)
+#             total_hours += (EndTime//(60*60) - TimeOffset//(60*60))
+#             total_mins  += (EndTime%(60*60) - TimeOffset//(60*60))
             for i in range(len(EventStart)):
                 sec_counts += ( EventEnd[i]- EventStart[i])//(15)
-
-        min_counts = sec_counts/60
-        hour_counts = min_counts/60
-        return meal_counts, min_counts,hour_counts, day_counts
+        total_hours = total_sec//(60*60)
+        min_counts = sec_counts//60
+        hour_counts = min_counts//60
+        
+        return meal_counts, min_counts,hour_counts, day_counts, total_hours
 
 
         

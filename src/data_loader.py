@@ -135,6 +135,7 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
     EventEnd = (np.zeros((100))).astype(int)
     TotalEvents = 0
     TimeOffset = 0
+    EndTime = 0
     file = open(EventsFileName, "r") 
     for lines in file:
         
@@ -158,6 +159,18 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
             TimeOffset = (hours * 60 * 60) + (minutes * 60) + seconds
             continue
         if(words[0] == "END"):
+            if words[2].count(":") <2:
+                words[2] = words[2] +":00"
+            if debug_flag:
+                print(words[2])
+            hours = int("24" if words[2].split(":")[0] == "00" else words[2].split(":")[0])
+            
+            minutes = int(words[2].split(":")[1])
+            seconds = int(words[2].split(":")[2])
+    
+            #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+            EndTime = ((hours * 60 * 60) + (minutes * 60) + seconds ) 
+            
             continue
          
         # word index 
@@ -208,7 +221,7 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
         if(skipmeal == 1): continue
         TotalEvents = TotalEvents + 1
         EventNames.append(ename)
-    return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset
+    return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset, EndTime
 
 
 def detrend(data, trend_window = 150):
@@ -411,7 +424,7 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
         ###################################
         # Identify things as GT
         
-        TotalEvents, EventStart, EventEnd, EventNames, TimeOffset = loadEvents(File_Name, debug_flag = debug_flag)
+        TotalEvents, EventStart, EventEnd, EventNames, TimeOffset,EndTime = loadEvents(File_Name, debug_flag = debug_flag)
         GT = np.zeros((len(Normalized))).astype(int)
         for i in range(TotalEvents):
             #print(EventStart[i], EventStart[i], type(EventStart[i]))
