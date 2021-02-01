@@ -1,0 +1,6 @@
+,dataset,Days,Meal_Hours,Meal_Counts,win(sec),TPR: Individual-Model,TPR: GroupModel,FP/TP: Individual-Model,FP/TP: GroupModel,TP: Individual-Model,TP: GroupModel,FP: Individual-Model,FP: GroupModel,FN: Individual-Model,FN: GroupModel
+0,wenkanw,17,7,32,360,0.969,0.625,0.516,0.3,31,20,16,6,1,12
+1,adam,14,3,26,360,0.885,0.923,0.217,0.333,23,24,5,8,3,2
+2,lawler,23,25,61,360,0.443,0.328,0.963,2.6,27,20,26,52,34,41
+3,shaurya,6,3,17,360,0.824,0.824,2.143,0.643,14,14,30,9,3,3
+4,average performance,-,-,-,-,0.78,0.675,0.96,0.969,23.75,19.5,19.25,18.75,10.25,14.5

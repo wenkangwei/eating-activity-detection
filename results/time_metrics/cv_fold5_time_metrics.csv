@@ -1,0 +1,6 @@
+dataset,win(sec),WAcc: GroupModel,WAcc2: GroupModel,WAcc: Individual-Model,WAcc2: Individual-Model,F1: GroupModel,F1: Individual-Model,Precision: GroupModel,Precision: Individual-Model,Recall: GroupModel,Recall: Individual-Model,Acc: GroupModel,Acc: Individual-Model
+wenkanw,360,0.779,0.796,0.901,0.906,0.423,0.655,0.319,0.547,0.649,0.848,0.893,0.946
+adam,360,0.956,0.942,0.948,0.961,0.433,0.641,0.284,0.533,0.983,0.925,0.931,0.97
+lawler,360,0.605,0.644,0.698,0.752,0.132,0.255,0.076,0.175,0.494,0.512,0.707,0.866
+shaurya,360,0.759,0.769,0.751,0.756,0.409,0.382,0.308,0.286,0.624,0.624,0.874,0.859
+average performance,-,0.775,0.788,0.824,0.844,0.349,0.483,0.247,0.385,0.688,0.727,0.851,0.91
