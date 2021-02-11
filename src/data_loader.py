@@ -101,7 +101,7 @@ def smooth(RawData, WINDOW_SIZE = 15,SIG = 10.0 ):
 
 
 
-def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/"):
+def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/", enable_cross_day=True):
     """
     loads events data given the .shm filename
     and parse the event.txt file to obtain meal duration
@@ -137,6 +137,9 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
     TimeOffset = 0
     EndTime = 0
     file = open(EventsFileName, "r") 
+    start_hour = None
+    end_hour = None
+    start_line= None
     for lines in file:
         
         words = lines.split()
@@ -152,9 +155,10 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
             if debug_flag:
                 print(words[2])
             hours = int(words[2].split(":")[0])
+            start_hour = hours
             minutes = int(words[2].split(":")[1])
             seconds = int(words[2].split(":")[2])
-    
+            start_line = lines
             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
             TimeOffset = (hours * 60 * 60) + (minutes * 60) + seconds
             continue
@@ -163,8 +167,16 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
                 words[2] = words[2] +":00"
             if debug_flag:
                 print(words[2])
-            hours = int("24" if words[2].split(":")[0] == "00" else words[2].split(":")[0])
             
+            hours = int(words[2].split(":")[0])
+            if hours < start_hour and enable_cross_day:
+                hours += 24
+                if debug_flag:
+                    print(start_line)
+                    print(lines)
+                    print("End of File: ", EventsFileName)
+                    print("------------------------------")
+                    print()
             minutes = int(words[2].split(":")[1])
             seconds = int(words[2].split(":")[2])
     
@@ -190,6 +202,14 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
                     print(words[word_index])
 
                 hours = int(words[word_index].split(":")[0])
+                # if data is across two days, then hour is reset and then + 24
+                if hours < start_hour and enable_cross_day:
+                    if debug_flag:
+                        print("Update Hours")
+                        print("Hours:" , hours)
+                        print(lines)
+                    hours += 24
+                    
                 minutes = int(words[word_index].split(":")[1])
                 seconds = int(words[word_index].split(":")[2])
                 EventTime = (hours * 60 * 60) + (minutes * 60) + seconds
@@ -200,10 +220,16 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
             word_index += 1
             
         if(TotalEvents>0):
-            if(EventStart[TotalEvents]<EventStart[TotalEvents-1]):
+            # Make sure the end time of last event < the start time of the current event
+            if(EventStart[TotalEvents]<EventEnd[TotalEvents-1]):
                 EventStart[TotalEvents] = EventStart[TotalEvents] + (24*60*60*15)
-            if(EventEnd[TotalEvents]<EventEnd[TotalEvents-1]):
+            # make sure the start time of current event < the end time of current event
+            if(EventStart[TotalEvents] > EventEnd[TotalEvents]):
                 EventEnd[TotalEvents] = EventEnd[TotalEvents] + (24*60*60*15)
+        elif TotalEvents ==0:
+            # if the first meal in a day is across 0am, then update time
+            if(EventStart[0]>EventEnd[0]):
+                EventEnd[0] = EventEnd[0] + (24*60*60*15)
         
         
         # Check if meal was triaged out for too much walking or rest
@@ -222,6 +248,135 @@ def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-f
         TotalEvents = TotalEvents + 1
         EventNames.append(ename)
     return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset, EndTime
+
+
+
+##### backup
+# def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/", enable_cross_day=True):
+#     """
+#     loads events data given the .shm filename
+#     and parse the event.txt file to obtain meal duration
+#     Input: 
+#         filename:  <filename>-events.txt name of label file we want to load
+#     output:
+#         TotalEvents: amount of event loaded
+#         EventStart: a list of starting moment of meals
+#         EventEnd: a list of ending moment of meals
+#         EventNames: name of meal in string
+#     """
+#     # Load the meals file to get any triaged meals.
+#     SkippedMeals = []
+#     if print_file:
+#         print("Loading File: ", filename)
+#     mealsfile = open( root_path +"meals-shimmer.txt", "r") 
+    
+#     for line in mealsfile:
+#         #print(line)
+#         data = line.split()
+#         #print(data[0], data[1], data[13])
+#         if(int(data[13]) == 0):
+#             Mdata = [data[0][-9:], data[1], int(data[13])]
+#             SkippedMeals.append(Mdata)
+    
+#     EventsFileName = filename.replace(".shm","-events.txt")
+    
+#     # Load the meals
+#     EventNames = []
+#     EventStart = (np.zeros((100))).astype(int)
+#     EventEnd = (np.zeros((100))).astype(int)
+#     TotalEvents = 0
+#     TimeOffset = 0
+#     EndTime = 0
+#     file = open(EventsFileName, "r") 
+    
+#     for lines in file:
+        
+#         words = lines.split()
+#         if debug_flag:
+#             print("Words:", words)
+            
+#         if(len(words) == 0): continue # Skip empty lines
+#         # Convert Start time to offset
+#         if(words[0] == "START"): # Get Start Time (TimeOffset) from file
+#             #print(words)
+#             if words[2].count(":") <2:
+#                 words[2] = words[2] +":00"
+#             if debug_flag:
+#                 print(words[2])
+#             hours = int(words[2].split(":")[0])
+#             minutes = int(words[2].split(":")[1])
+#             seconds = int(words[2].split(":")[2])
+#             start_line = lines
+#             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+#             TimeOffset = (hours * 60 * 60) + (minutes * 60) + seconds
+#             continue
+#         if(words[0] == "END"):
+#             if words[2].count(":") <2:
+#                 words[2] = words[2] +":00"
+#             if debug_flag:
+#                 print(words[2])
+            
+#             hours = int(words[2].split(":")[0])
+#             minutes = int(words[2].split(":")[1])
+#             seconds = int(words[2].split(":")[2])
+    
+#             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+#             EndTime = ((hours * 60 * 60) + (minutes * 60) + seconds ) 
+            
+#             continue
+         
+#         # word index 
+#         word_index = 0
+#         count = 0
+#         if debug_flag:
+#             print("Debug: ",words)
+#         while count <2 and word_index < len(words): # Process Events Data
+#             # skip all not- numeric string
+#             if words[word_index].replace(":","").isnumeric():
+#                 count += 1
+#                 # check if time format is correct, if not, add ":00"
+#                 if words[word_index].count(":") <2:
+#                     words[word_index] = words[word_index] +":00"
+                    
+#                 if debug_flag:
+#                     print(words[word_index])
+
+#                 hours = int(words[word_index].split(":")[0])
+#                 minutes = int(words[word_index].split(":")[1])
+#                 seconds = int(words[word_index].split(":")[2])
+#                 EventTime = (hours * 60 * 60) + (minutes * 60) + seconds
+#                 EventTime = EventTime - TimeOffset
+#                 if(count == 1): EventStart[TotalEvents] = EventTime * 15
+#                 if(count == 2): EventEnd[TotalEvents] = EventTime * 15
+            
+#             word_index += 1
+            
+#         if(TotalEvents>0):
+#             if(EventStart[TotalEvents]<EventStart[TotalEvents-1]):
+#                 EventStart[TotalEvents] = EventStart[TotalEvents] + (24*60*60*15)
+#             if(EventEnd[TotalEvents]<EventEnd[TotalEvents-1]):
+#                 EventEnd[TotalEvents] = EventEnd[TotalEvents] + (24*60*60*15)
+            
+        
+#         # Check if meal was triaged out for too much walking or rest
+#         ename = words[0]
+#         fname = filename[-9:]
+#         skipmeal = 0
+#         #print(fname, ename)
+#         for skippedmeal in SkippedMeals:
+#             Pname, EventName, Keep = skippedmeal
+#             if(Pname == fname and ename == EventName):
+#                 #print(Pname, EventName, Keep, ename, fname, Pname == fname, ename == EventName)
+#                 skipmeal = 1
+#                 break
+        
+#         if(skipmeal == 1): continue
+#         TotalEvents = TotalEvents + 1
+#         EventNames.append(ename)
+#     return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset, EndTime
+
+
+
 
 
 def detrend(data, trend_window = 150):

@@ -1,0 +1,12 @@
+IndividualData/james-data/02-03-2021/Day13.shm
+IndividualData/james-data/02-02-2021/Day12.shm
+IndividualData/james-data/02-01-2021/Day11.shm
+IndividualData/james-data/1-30-2021/Day9.shm
+IndividualData/james-data/1-26-2021/Day5.shm
+IndividualData/james-data/1-25-2021/Day4.shm
+IndividualData/james-data/1-29-2021/Day8.shm
+IndividualData/james-data/1-24-2021/Day3.shm
+IndividualData/james-data/02-04-2021/Day14.shm
+IndividualData/james-data/1-31-2021/Day10.shm
+IndividualData/james-data/1-27-2021/Day6.shm
+IndividualData/james-data/1-28-2021/Day7.shm

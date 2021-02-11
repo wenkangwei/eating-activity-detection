@@ -1,5 +1,6 @@
 
 
+
 from data_loader import *
 import numpy as np
 import pandas as pd
@@ -375,3 +376,108 @@ def balance_data_indices(labels, data_indices=None,sample_num = 4000,mode= "unde
         np.random.shuffle(indices_balanced)
     
     return indices_balanced
+
+def create_datasets(names=[]):
+    """
+    generate a dictionary of datasets
+    """
+    datasets = {}
+    for person in names:
+        meal_data = Person_MealsDataset(person_name= person, file_name = "all_files_list", winmin = 6,stridesec = 5,smooth_flag = 1,
+                     normalize_flag = 1)
+        datasets[person]  = meal_data
+    return datasets
+
+
+from collections import defaultdict
+from data_loader import loadEvents
+def get_meal_info(person_name = None,file_ls = [], file_ls_doc=None,root_path = "../data/",print_file=False,round_decimal=1):
+        """
+        if file_ls is not given, then get file_ls according to person_name
+        file path = root_path + file name in all_files_list.txt
+
+        return:
+            meal event count, total minutes of all meals, total hours of all meals,total day counts
+
+        """
+        meal_counts = 0
+        sec_counts = 0
+        min_counts = 0
+        hour_counts = 0
+        total_hours = 0
+        total_mins = 0
+        total_sec = 0
+        day_counts = 0 
+        if person_name ==None:
+            return meal_counts, min_counts,hour_counts, day_counts, total_hours
+
+        data_indices_file = "../data-file-indices/" +person_name+"/all_files_list.txt"
+        fp = open(data_indices_file,"r")
+        txt = fp.read()
+        fp.close()
+        file_ls = txt.split("\n")
+        while '' in file_ls:
+            file_ls.remove('')
+       
+        day_counts = len(file_ls)
+        
+        for file_name in file_ls:
+            file_name = root_path + file_name
+            TotalEvents, EventStart, EventEnd, EventNames, TimeOffset,EndTime = loadEvents(file_name, debug_flag = False, print_file=print_file)
+            meal_counts += TotalEvents
+            total_sec +=  abs(EndTime - TimeOffset)
+            for i in range(len(EventStart)):
+                sec_counts += ( EventEnd[i]- EventStart[i])//15
+                
+        total_hours = total_sec/(60*60)
+        min_counts = sec_counts/60
+        hour_counts = min_counts/60
+        average_meal_per_day = meal_counts/len(file_ls)
+        average_hour_per_meal = hour_counts/meal_counts
+        # round numbers
+        total_hours = round(total_hours, round_decimal)
+        min_counts = round(min_counts, round_decimal)
+        hour_counts = round(hour_counts, round_decimal)
+        average_meal_per_day = round(average_meal_per_day,round_decimal)
+        average_hour_per_meal = round(average_hour_per_meal, round_decimal)
+        
+        no_eating_hours = total_hours - hour_counts
+        weight_ratio = round(no_eating_hours/hour_counts, round_decimal)
+        result = pd.DataFrame({"dataset": person_name,"Days":day_counts, 
+                      "Total Hours":total_hours,"Meal Counts":meal_counts,
+                      "Average Meal Counts Per Day":average_meal_per_day,"Average Hours Per Meal": average_hour_per_meal,
+                      "Eating Hours":hour_counts, "No Eating Hours":no_eating_hours,
+                     "Balance Ratio(no_eat/eat)":weight_ratio},index=[0])
+    
+        return result
+
+          
+def get_dataset_info(names= ["wenkanw"],winmin=6,stridesec=5):
+    meal_info = defaultdict(list)
+    dataset_results = pd.DataFrame()
+    for name in names:
+        result = get_meal_info(person_name=name)
+        if dataset_results.empty:
+            dataset_results = result
+        else:
+            dataset_results = dataset_results.append(result,ignore_index=True)
+    
+    # append total summary
+#     print( dataset_results)
+    total_result=pd.DataFrame({"dataset":"total"},columns = dataset_results.columns,index=[0])
+    # append average summary
+    average_result=pd.DataFrame({"dataset":"average"},columns = dataset_results.columns,index=[0])
+    key_ls = ["Days","Total Hours","Meal Counts","Eating Hours","No Eating Hours"]
+    for key in dataset_results.columns:
+        if key in key_ls:
+            total_result[key].at[0] = round(dataset_results[key].sum() ,1)
+            average_result[key].at[0] = round(dataset_results[key].mean(),1)
+
+    ls = [total_result, average_result]
+    for df in ls:
+        df["Average Meal Counts Per Day"].at[0] = round(df["Meal Counts"].values[0]/df["Days"].values[0], 1)
+        df["Average Hours Per Meal"].at[0] =round( df["Eating Hours"].values[0]/df["Meal Counts"].values[0], 1)
+        df["Balance Ratio(no_eat/eat)"].at[0] =round(df["No Eating Hours"].values[0]/df["Eating Hours"].values[0],1)
+        dataset_results =dataset_results.append(df,ignore_index=True)
+
+    return dataset_results

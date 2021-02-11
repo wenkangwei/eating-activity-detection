@@ -1,4 +1,2 @@
-IndividualData/adam-data/09-22-2020/09-22-2020.shm
-IndividualData/adam-data/10-28-2020/10-28-2020.shm
-IndividualData/adam-data/11-09-2020/11-09-2020.shm
-IndividualData/adam-data/11-11-2020/11-11-2020-1.shm
+IndividualData/adam-data/12-01-2020/12-01-2020.shm
+IndividualData/adam-data/11-24-2020/11-24-2020.shm
