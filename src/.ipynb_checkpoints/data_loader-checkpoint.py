@@ -53,7 +53,12 @@ def loadshmfile(File_Name):
     Load shm data file
     Output:
         6-axis gyroscope, accelerator time series data in numpy format
+       The first 3 columns are accelerator data x, y,z
+       The last 3 columns are gyroscope data x, y,z
+       accelerator: col0, x: forward-backward (沿着手臂方向)  col1, y:  left-right(垂直手臂axis方向移动)，， col2, z:  up-down(上下平移), 
+       gyroscope:  col 3,yaw: 水平旋转，col4, pitch 平行手臂的前后翻转，  col5, roll 绕着手臂环的axis左右翻转旋转， 
     """
+    
     MB = 1024 * 1024
     RawData = np.fromfile(File_Name, dtype=np.dtype("6f4")) 
     #print(f"File {File_Name} Loaded")
@@ -96,7 +101,7 @@ def smooth(RawData, WINDOW_SIZE = 15,SIG = 10.0 ):
 
 
 
-def loadEvents(filename,debug_flag=False):
+def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/", enable_cross_day=True):
     """
     loads events data given the .shm filename
     and parse the event.txt file to obtain meal duration
@@ -110,8 +115,10 @@ def loadEvents(filename,debug_flag=False):
     """
     # Load the meals file to get any triaged meals.
     SkippedMeals = []
-    print("Loading File: ", filename)
-    mealsfile = open("meals-shimmer.txt", "r") 
+    if print_file:
+        print("Loading File: ", filename)
+    mealsfile = open( root_path +"meals-shimmer.txt", "r") 
+    
     for line in mealsfile:
         #print(line)
         data = line.split()
@@ -128,8 +135,11 @@ def loadEvents(filename,debug_flag=False):
     EventEnd = (np.zeros((100))).astype(int)
     TotalEvents = 0
     TimeOffset = 0
+    EndTime = 0
     file = open(EventsFileName, "r") 
-    #print(filename)
+    start_hour = None
+    end_hour = None
+    start_line= None
     for lines in file:
         
         words = lines.split()
@@ -145,45 +155,82 @@ def loadEvents(filename,debug_flag=False):
             if debug_flag:
                 print(words[2])
             hours = int(words[2].split(":")[0])
+            start_hour = hours
             minutes = int(words[2].split(":")[1])
             seconds = int(words[2].split(":")[2])
-    
+            start_line = lines
             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
             TimeOffset = (hours * 60 * 60) + (minutes * 60) + seconds
             continue
         if(words[0] == "END"):
-            #print(words)
+            if words[2].count(":") <2:
+                words[2] = words[2] +":00"
+            if debug_flag:
+                print(words[2])
+            
+            hours = int(words[2].split(":")[0])
+            if hours < start_hour and enable_cross_day:
+                hours += 24
+                if debug_flag:
+                    print(start_line)
+                    print(lines)
+                    print("End of File: ", EventsFileName)
+                    print("------------------------------")
+                    print()
+            minutes = int(words[2].split(":")[1])
+            seconds = int(words[2].split(":")[2])
+    
+            #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+            EndTime = ((hours * 60 * 60) + (minutes * 60) + seconds ) 
+            
             continue
-            
-        x = 0
+         
+        # word index 
+        word_index = 0
         count = 0
-        while count <2: # Process Events Data
-            x += 1
+        if debug_flag:
+            print("Debug: ",words)
+        while count <2 and word_index < len(words): # Process Events Data
             # skip all not- numeric string
-            if words[x].replace(":","").isnumeric():
+            if words[word_index].replace(":","").isnumeric():
                 count += 1
-            
                 # check if time format is correct, if not, add ":00"
-                if words[x].count(":") <2:
-                    words[x] = words[x] +":00"
+                if words[word_index].count(":") <2:
+                    words[word_index] = words[word_index] +":00"
                     
                 if debug_flag:
-                    print(words[x])
+                    print(words[word_index])
 
-                hours = int(words[x].split(":")[0])
-                minutes = int(words[x].split(":")[1])
-                seconds = int(words[x].split(":")[2])
+                hours = int(words[word_index].split(":")[0])
+                # if data is across two days, then hour is reset and then + 24
+                if hours < start_hour and enable_cross_day:
+                    if debug_flag:
+                        print("Update Hours")
+                        print("Hours:" , hours)
+                        print(lines)
+                    hours += 24
+                    
+                minutes = int(words[word_index].split(":")[1])
+                seconds = int(words[word_index].split(":")[2])
                 EventTime = (hours * 60 * 60) + (minutes * 60) + seconds
                 EventTime = EventTime - TimeOffset
                 if(count == 1): EventStart[TotalEvents] = EventTime * 15
                 if(count == 2): EventEnd[TotalEvents] = EventTime * 15
-                
+            
+            word_index += 1
+            
         if(TotalEvents>0):
-            if(EventStart[TotalEvents]<EventStart[TotalEvents-1]):
+            # Make sure the end time of last event < the start time of the current event
+            if(EventStart[TotalEvents]<EventEnd[TotalEvents-1]):
                 EventStart[TotalEvents] = EventStart[TotalEvents] + (24*60*60*15)
-            if(EventEnd[TotalEvents]<EventEnd[TotalEvents-1]):
+            # make sure the start time of current event < the end time of current event
+            if(EventStart[TotalEvents] > EventEnd[TotalEvents]):
                 EventEnd[TotalEvents] = EventEnd[TotalEvents] + (24*60*60*15)
-        #print(TotalEvents)
+        elif TotalEvents ==0:
+            # if the first meal in a day is across 0am, then update time
+            if(EventStart[0]>EventEnd[0]):
+                EventEnd[0] = EventEnd[0] + (24*60*60*15)
+        
         
         # Check if meal was triaged out for too much walking or rest
         ename = words[0]
@@ -200,13 +247,154 @@ def loadEvents(filename,debug_flag=False):
         if(skipmeal == 1): continue
         TotalEvents = TotalEvents + 1
         EventNames.append(ename)
-    return TotalEvents, EventStart, EventEnd, EventNames
+    return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset, EndTime
 
+
+
+##### backup
+# def loadEvents(filename ,debug_flag=False, print_file= True,root_path="../data-file-indices/CAD/", enable_cross_day=True):
+#     """
+#     loads events data given the .shm filename
+#     and parse the event.txt file to obtain meal duration
+#     Input: 
+#         filename:  <filename>-events.txt name of label file we want to load
+#     output:
+#         TotalEvents: amount of event loaded
+#         EventStart: a list of starting moment of meals
+#         EventEnd: a list of ending moment of meals
+#         EventNames: name of meal in string
+#     """
+#     # Load the meals file to get any triaged meals.
+#     SkippedMeals = []
+#     if print_file:
+#         print("Loading File: ", filename)
+#     mealsfile = open( root_path +"meals-shimmer.txt", "r") 
+    
+#     for line in mealsfile:
+#         #print(line)
+#         data = line.split()
+#         #print(data[0], data[1], data[13])
+#         if(int(data[13]) == 0):
+#             Mdata = [data[0][-9:], data[1], int(data[13])]
+#             SkippedMeals.append(Mdata)
+    
+#     EventsFileName = filename.replace(".shm","-events.txt")
+    
+#     # Load the meals
+#     EventNames = []
+#     EventStart = (np.zeros((100))).astype(int)
+#     EventEnd = (np.zeros((100))).astype(int)
+#     TotalEvents = 0
+#     TimeOffset = 0
+#     EndTime = 0
+#     file = open(EventsFileName, "r") 
+    
+#     for lines in file:
+        
+#         words = lines.split()
+#         if debug_flag:
+#             print("Words:", words)
+            
+#         if(len(words) == 0): continue # Skip empty lines
+#         # Convert Start time to offset
+#         if(words[0] == "START"): # Get Start Time (TimeOffset) from file
+#             #print(words)
+#             if words[2].count(":") <2:
+#                 words[2] = words[2] +":00"
+#             if debug_flag:
+#                 print(words[2])
+#             hours = int(words[2].split(":")[0])
+#             minutes = int(words[2].split(":")[1])
+#             seconds = int(words[2].split(":")[2])
+#             start_line = lines
+#             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+#             TimeOffset = (hours * 60 * 60) + (minutes * 60) + seconds
+#             continue
+#         if(words[0] == "END"):
+#             if words[2].count(":") <2:
+#                 words[2] = words[2] +":00"
+#             if debug_flag:
+#                 print(words[2])
+            
+#             hours = int(words[2].split(":")[0])
+#             minutes = int(words[2].split(":")[1])
+#             seconds = int(words[2].split(":")[2])
+    
+#             #print("{}h:{}m:{}s".format(hours, minutes,seconds))
+#             EndTime = ((hours * 60 * 60) + (minutes * 60) + seconds ) 
+            
+#             continue
+         
+#         # word index 
+#         word_index = 0
+#         count = 0
+#         if debug_flag:
+#             print("Debug: ",words)
+#         while count <2 and word_index < len(words): # Process Events Data
+#             # skip all not- numeric string
+#             if words[word_index].replace(":","").isnumeric():
+#                 count += 1
+#                 # check if time format is correct, if not, add ":00"
+#                 if words[word_index].count(":") <2:
+#                     words[word_index] = words[word_index] +":00"
+                    
+#                 if debug_flag:
+#                     print(words[word_index])
+
+#                 hours = int(words[word_index].split(":")[0])
+#                 minutes = int(words[word_index].split(":")[1])
+#                 seconds = int(words[word_index].split(":")[2])
+#                 EventTime = (hours * 60 * 60) + (minutes * 60) + seconds
+#                 EventTime = EventTime - TimeOffset
+#                 if(count == 1): EventStart[TotalEvents] = EventTime * 15
+#                 if(count == 2): EventEnd[TotalEvents] = EventTime * 15
+            
+#             word_index += 1
+            
+#         if(TotalEvents>0):
+#             if(EventStart[TotalEvents]<EventStart[TotalEvents-1]):
+#                 EventStart[TotalEvents] = EventStart[TotalEvents] + (24*60*60*15)
+#             if(EventEnd[TotalEvents]<EventEnd[TotalEvents-1]):
+#                 EventEnd[TotalEvents] = EventEnd[TotalEvents] + (24*60*60*15)
+            
+        
+#         # Check if meal was triaged out for too much walking or rest
+#         ename = words[0]
+#         fname = filename[-9:]
+#         skipmeal = 0
+#         #print(fname, ename)
+#         for skippedmeal in SkippedMeals:
+#             Pname, EventName, Keep = skippedmeal
+#             if(Pname == fname and ename == EventName):
+#                 #print(Pname, EventName, Keep, ename, fname, Pname == fname, ename == EventName)
+#                 skipmeal = 1
+#                 break
+        
+#         if(skipmeal == 1): continue
+#         TotalEvents = TotalEvents + 1
+#         EventNames.append(ename)
+#     return TotalEvents, EventStart, EventEnd, EventNames, TimeOffset, EndTime
+
+
+
+
+
+def detrend(data, trend_window = 150):
+    # Remove acceleration time series trend
+    mean = []
+    for j in range(3):
+        dat = pd.Series(data[:,j]).rolling(window=trend_window).mean()
+        dat[:trend_window-1] = 0
+        mean.append(dat)
+    mean2 = np.asarray(mean).transpose()
+    data[:,0:3]-=mean2
+    del mean2, mean, dat
+    return data 
 
 
 
 def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, files_list='batch-unix.txt', 
-                 removerest=1, removewalk=0, removebias=1, shx=1, gtperc = 0.5,root_path="../Data/", 
+                 removerest=1, removewalk=0, remove_trend=1, smooth_flag = 1, normalize_flag=1,shx=1, gtperc = 0.5,root_path="../data/", 
                         tqdm_flag=False, debug_flag=False):
     """
     Input:
@@ -222,17 +410,37 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
         
     Output:
         len(df["Filenames"]) : amount of day of dataset
-        AllNormalized: normalized, smoothed dataset
-        samples_array: list of indices of sample frame in dataset, 
+        preprocessed_data: normalized, smoothed dataset
+        
+        samples_indices: list of indices of sample frame in dataset, 
                         format: [(i^th day, start time of window, end time of window),... ]
-        labels_array: labels corresponding to each segmentation/window
+        labels_indices: labels corresponding to each segmentation/window
+   Data Structure:
+       preprocessed_data:
+       [one day data: [dataframe list[axis1: [],axis2: [],axis3: [],axis4: [],axis5: [],axis6: []]....  ],
+       [],
+       [],
+       ...
+       ]
+      
+       samples_indices: 
+       [ dataframe:[x_day, start_time, end_time] ... ] ,
+       [],
+       [],
+       ...
+       ]
+       label_indices:
+       [label of a dataframe  ,
+       ...
+       ]
+       
         
     """
     ### Load data, make samples 
 
     samples = []
     labels = []
-    AllNormalized = []
+    preprocessed_data = []
     AllIndices = []
     totaleatingrest = 0
     totaleatingwalk = 0
@@ -241,6 +449,7 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
     df = pd.read_csv(files_list, names=["Filenames"])
     
     #if ratio is 1, then do nothing
+    # Otherwise, Sample some days of data based on ratio
     if ratio_dataset != 1.0:
         if ratio_dataset<1 and ratio_dataset>=0:
             # sample days without replacement
@@ -270,31 +479,47 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
         #Data preprocessing, Smoothing here
         #################################            
         # smoothing
-        Smoothed = smooth(RawData)
+        if smooth_flag:
+            Smoothed = smooth(RawData)
+            if debug_flag:
+                print("Smoothed Data")
+        else:
+            Smoothed = RawData
+        
         
         # remove trend of series data
         # Option:  remove acceleration bias or not using a slide window to compute mean
-        if(removebias):
+        if(remove_trend):
             # Remove acceleration bias
-            TREND_WINDOW = 150
-            mean = []
-            for j in range(3):
-                dat = pd.Series(Smoothed[:,j]).rolling(window=TREND_WINDOW).mean()
-                dat[:TREND_WINDOW-1] = 0
-                mean.append(dat)
-            mean2 = np.roll(np.asarray(mean).transpose(), -((TREND_WINDOW//2)-1)*3) # Shift to the left to center the values
-            # The last value in mean [-75] does not match that of phoneview, but an error in one datum is acceptable
-            # The phone view code calculates mean from -Window/2 to <Window/2 instead of including it.
-            Smoothed[:,0:3]-=mean2
-            del mean2, mean, dat
-        
-        # Normalization: z-normalization
-        Normalized = np.empty_like(Smoothed)
-        for i in range(6):
-            Normalized[:,i] = (Smoothed[:,i] - meanvals[i]) / stdvals[i]
-        # Stick this Normalized data to the Full Array
-        AllNormalized.append(np.copy(Normalized))
+            Smoothed = detrend(Smoothed, trend_window =150)
+#             TREND_WINDOW = 150
+#             mean = []
+#             for j in range(3):
+#                 dat = pd.Series(Smoothed[:,j]).rolling(window=TREND_WINDOW).mean()
+#                 dat[:TREND_WINDOW-1] = 0
+#                 mean.append(dat)
+#             mean2 = np.roll(np.asarray(mean).transpose(), -((TREND_WINDOW//2)-1)*3) # Shift to the left to center the values
+#             # The last value in mean [-75] does not match that of phoneview, but an error in one datum is acceptable
+#             # The phone view code calculates mean from -Window/2 to <Window/2 instead of including it.
+#             Smoothed[:,0:3]-=mean2
+#             del mean2, mean, dat
 
+        if normalize_flag:
+            # Z-Normalization after removing trend of time series     
+            Normalized = normalize(Smoothed,mode ="default", meanvals=meanvals, stdvals=stdvals)
+            if debug_flag:
+                print("Normalized Data")
+        else:
+            Normalized = Smoothed
+        preprocessed_data.append(Normalized)
+        
+        
+#         Normalized = np.empty_like(Smoothed)
+#         for i in range(6):
+#             Normalized[:,i] = (Smoothed[:,i] - meanvals[i]) / stdvals[i]
+#         # Stick this Normalized data to the Full Array
+#         preprocessed_data.append(np.copy(Normalized))
+        
         
         if(removerest != 0):
         # remove labels for the class of rest 
@@ -308,6 +533,7 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
             accstd = np.sum(std2[:,:3], axis=1)
             gyrostd = np.sum(std2[:,-3:], axis=1)
             datrest = (accstd < ACC_THRESH) & (gyrostd < GYRO_THRESH)
+            # Results of rest labels
             mrest = datrest.copy()
 
             for i in range(8,len(datrest)-7):
@@ -343,6 +569,7 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
 
             zc = [0 if i==0 else 1 for i in zerocross]
             del minv, maxv, zerocross
+
         
         del RawData, Smoothed
 
@@ -352,19 +579,22 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
         ###################################
         # Identify things as GT
         
-        [TotalEvents, EventStart, EventEnd, EventNames] = loadEvents(File_Name,debug_flag)
+        TotalEvents, EventStart, EventEnd, EventNames, TimeOffset,EndTime = loadEvents(File_Name, debug_flag = debug_flag)
         GT = np.zeros((len(Normalized))).astype(int)
         for i in range(TotalEvents):
             #print(EventStart[i], EventStart[i], type(EventStart[i]))
             GT[EventStart[i]: EventEnd[i]+1] = 1
         
-        # Generate labels 
+        # Generate Sample Indices (Not sample data) and Labels
         MaxData = len(Normalized)
         for t in range(0, MaxData, step):
-            # x: the x^th day data in dataset
+            # x: the x^th file data in dataset
             # t: starting time of eating
             # t+ winlength:  end time of eating
-            sample = [x, t, t+winlength]
+            # gtperc: Ground Truth percentage
+            # Generate indices of sample
+            sample_indices = [x, t, t+winlength,TimeOffset]
+            #Generate label
             label = int((np.sum(GT[t:t+winlength])/winlength)>=gtperc)
             
             #Change labels if the flag of removerest or removewalk is enabled
@@ -378,54 +608,52 @@ def load_PreprocessData(winlength, step, meanvals, stdvals,ratio_dataset=1, file
                 if(iswalk and removewalk==1): continue;
                 elif(iswalk and removewalk==2): label=0;
                 else: label = 1
-#                fileeatingwalk+=1
-#                continue # Do not append this sample to the dataset
+
                 
             if(t+winlength < MaxData): # Ignore last small window. Not ignoring results in a list rather than a numpy array.
-                filesamples.append(sample)
+                filesamples.append(sample_indices)
                 filelabels.append(label)
                 
-        #merge two lists
+        #merge sample indices of one day to the whole data list
         samples += filesamples
         labels += filelabels
         numsamples = len(filesamples)
         totaleatingwalk += fileeatingwalk
 
-    samples_array = np.asarray(samples)
+    samples_indices = np.asarray(samples)
     labels_array = np.asarray(labels)
-    #print("Total {:d} walking in eating\n".format(fileeatingwalk))
-    return len(df["Filenames"]), AllNormalized, samples_array, labels_array
+    
+    return len(df["Filenames"]), preprocessed_data, samples_indices, labels_array
 
 
 
-def normalizeData(data, meanvals, stdvals):
+def normalize(data,mode ="default", meanvals=all_zero_means, stdvals=shimmer_trended_stddev):
     """
     Normalize data using given mean values and std variance values
     Input:
-         data: time series data set to normalize
+         data: time series data set to normalize. data is one day data with 6 channels
          meanvals: global mean value of all days dataset used to smooth per day time series data
          stdvals: global standard variance.
     Output:
         smoothed data
     
     """
-    data = []
-    for x in range(len(data)):
-        Smoothed = data[x]
-        Normalized = np.empty_like(Smoothed)
-        # Normalize
-        for i in range(6):
-            Normalized[:,i] = (Smoothed[:,i] - meanvals[i]) / stdvals[i]
-        
-        # Stick this Normalized data to the Full Array
-        AllNormalized.append(np.copy(Normalized))
     
-    return AllNormalized
+    data_normalized = np.empty_like(data)
+    # Normalize
+    for i in range(6):
+        if mode =="default":
+            data_normalized[:,i] = (data[:,i] - np.mean(data[:,i]))/ np.std(data[:,i])
+        else:
+            data_normalized[:,i] = (data[:,i] - np.mean(meanvals[i]))/ np.std(stdvals[i])
+        
+    return data_normalized
 
 
 
 
-def load_dataset(data, samples_indices, labels_array, shuffle_flag = True, undersampling= True, test_split_ratio =0.3):
+def load_dataset(data, data_indices, label_indices,raw_data_flag =True ,shuffle_flag = False, 
+                 undersampling= False, enabled_time =True,test_split_ratio =0.3):
     """
     Note: need to run load_PreprocessData to get processed time series data and segmentation data
             before running this function
@@ -446,90 +674,72 @@ def load_dataset(data, samples_indices, labels_array, shuffle_flag = True, under
     import sys
     outfile = sys.stdout
     
-    data_indices = samples_indices
-    label_indices = labels_array
-
-    # Balance Data here
-    #undersample the training dataset
-    eatingindices = [i for i, e in enumerate(label_indices) if e >= 0.5]
-    noneatingindices = [i for i, e in enumerate(label_indices) if e < 0.5]
+    dataset = pd.DataFrame(columns=['data','label'])
+    if raw_data_flag:
+        for i in tqdm(range(len(label_indices))):
+            f,start_time, end_time = data_indices[i,0], data_indices[i,1], data_indices[i,2]
+            sample = data[f][start_time : end_time]
+            
+            if enabled_time:
+                time_offset = data_indices[i,3]
+                freq = 1.0/15.0
+                time_feat = np.array([[i for i in range(len(sample))]],dtype=float).transpose()
+                time_feat *= freq
+                time_feat += float(start_time)
+#                 print("Sample shape: ", sample.shape, "time shape:", time_feat.shape)
+                sample = np.concatenate((sample, time_feat),axis=1)
+            label = label_indices[i]
+            df = pd.DataFrame({'data':[sample], 'label':label})
+            dataset = dataset.append(df,ignore_index=True)
     
-    #split training set and test set
-    eat_len = len(eatingindices)
-    noneat_len = len(noneatingindices)
-    # Test set indices
-    test_noneating = noneatingindices[0: int( noneat_len*test_split_ratio)]
-    test_eating  =  eatingindices[0: int(eat_len*test_split_ratio)]  
-    test_indices = test_eating + test_noneating
-    # Train set indices
-    eatingindices = eatingindices[int(eat_len *test_split_ratio):]
-    noneatingindices = noneatingindices[int( noneat_len*test_split_ratio): ]
-    
-    
-    
-    
-    # training set 
-    if undersampling:
-        underSampledNoneatingIndices = random.sample(noneatingindices,len(eatingindices))
-        underSampledBalancedIndices = eatingindices + underSampledNoneatingIndices
-        shuffledUnderSampledBalancedIndices = underSampledBalancedIndices.copy()
-    else:
-        shuffledUnderSampledBalancedIndices = eatingindices+noneatingindices
-    
-    if shuffle_flag:
-        random.shuffle(shuffledUnderSampledBalancedIndices)
-
-    print("Creating balanced training data array", file=outfile, flush=True)
-    train_set = pd.DataFrame(columns=['data','label'])
-    test_set = pd.DataFrame(columns=['data','label'])
-
-    # use process bar to show the remaining items to handle
-    print("Loading training set...")
-    for _, i in enumerate(tqdm(shuffledUnderSampledBalancedIndices)):
-        f = data_indices[i,0]
-        t1, t2 = data_indices[i,1], data_indices[i,2]
-        sample,label = data[f][t1:t2], label_indices[i]
-        df = pd.DataFrame({'data':[sample], 'label':label})
-        train_set = train_set.append(df,ignore_index=True)
-    
-    print("Loading test set...")
-    for _, i in enumerate(tqdm(test_indices)):
-        f = data_indices[i,0]
-        t1, t2 = data_indices[i,1], data_indices[i,2]
-        sample,label = data[f][t1:t2], label_indices[i]
-        df = pd.DataFrame({'data':[sample], 'label':label})
-        test_set = test_set.append(df,ignore_index=True)
-    
-    return train_set, test_set
+    return dataset
 
 
-def load_train_test_data(data_path ='batch-unix.txt',
+def load_train_test_data(data_file_list ="../data-file-indices/CAD/"+ 'batch-unix.txt',
+                         load_splitted_dataset = False,
                          ratio_dataset=1, undersampling= True,
                          test_split_ratio = 0.3,
-                         winmin = 6, stridesec = 15, root_path ="../Data/" ):
+                         winmin = 6, stridesec = 15, 
+                         enabled_time_feat = True,
+                         gtperc = 0.5,
+                         removerest = 0, 
+                         removewalk = 0, 
+                         remove_trend = 0, 
+                         smooth_flag = 1, normalize_flag=1,
+                         data_root_path ="../data/",debug_flag=False ):
+    
+    # data_file_list: the name of a file containing list of shm files to load
+    # data_root_path: the name of the directory storing all real data
+    
 #         from datetime import datetime
-        ModelNum = 3 
-        
         winlength = int(winmin * 60 * 15)
         step = int(stridesec * 15)
-#         start_time = datetime.now()
         meanvals, stdvals =  all_zero_means, shimmer_trended_stddev
-#     winlength, step, meanvals, stdvals,ratio_dataset=1, files_list='batch-unix.txt', 
-#                  removerest=1, removewalk=0, removebias=1, shx=1, gtperc = 0.5
-        NumFiles, data, samples_indices, labels_array = load_PreprocessData(winlength,
+        
+    
+
+        files_counts, data, samples_indices, labels_array = load_PreprocessData(winlength,
                                                                                     step,
                                                                                     meanvals, 
                                                                                     stdvals,
-                                                                                    ratio_dataset =ratio_dataset,
-                                                                                    files_list=data_path, 
-                                                                                    removerest=0,
-                                                                                    removewalk=0,
-                                                                                    removebias=0,
-                                                                                    shx=1,
-                                                                                     gtperc = 0.5, root_path=root_path)
+                                                                                    
+                                                                                ratio_dataset =ratio_dataset,
+                                                                                    files_list=data_file_list, 
+                                                                                    removerest=removerest,
+                                                                                    removewalk=removewalk,
+                                                                                    remove_trend=remove_trend,
+                                                                                    smooth_flag = smooth_flag, 
+                                                                                   normalize_flag=normalize_flag,
+                                                                                    gtperc = gtperc,
+                                                                                
+                                                                                    debug_flag=debug_flag,
+                                                                                    root_path=data_root_path)
+        
+        dataset = None
+        if load_splitted_dataset:
+            dataset = load_dataset(data, samples_indices,
+                                         labels_array,undersampling= undersampling,
+                                         enabled_time = enabled_time_feat,
+                                         test_split_ratio=test_split_ratio)
 
-        train_set,test_set = load_dataset(data, samples_indices, labels_array,undersampling= undersampling,
-                                          test_split_ratio=test_split_ratio)
-
-
-        return train_set,test_set
+        return dataset, data, samples_indices, labels_array

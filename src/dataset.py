@@ -377,14 +377,14 @@ def balance_data_indices(labels, data_indices=None,sample_num = 4000,mode= "unde
     
     return indices_balanced
 
-def create_datasets(names=[]):
+def create_datasets(names=[], winmin = 6,stridesec = 5,smooth_flag = 1,normalize_flag = 1):
     """
     generate a dictionary of datasets
     """
     datasets = {}
     for person in names:
-        meal_data = Person_MealsDataset(person_name= person, file_name = "all_files_list", winmin = 6,stridesec = 5,smooth_flag = 1,
-                     normalize_flag = 1)
+        meal_data = Person_MealsDataset(person_name= person, file_name = "all_files_list", winmin = winmin,stridesec = stridesec,smooth_flag = smooth_flag,
+                     normalize_flag = normalize_flag)
         datasets[person]  = meal_data
     return datasets
 

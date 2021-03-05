@@ -284,7 +284,7 @@ def test_threshold_cv(datasets ,ts_ls=[],te_ls=[], fold_num=5,round_num = 3,path
                 df["TP"].append(TP)
                 df["FN"].append(FN)
                 df["FP"].append(FP)
-                df["TPR"].append(round(TP/(TP+FN),round_num))
+                df["TPR"].append(round(TP/(TP+FN) if (TP+FN)>0 else 0,round_num))
                 df["FP/TP"].append(round(FP/TP, round_num))
                 df = pd.DataFrame(df)
                 print(df)
@@ -306,15 +306,25 @@ def find_optimal_threshold(threshold_results,mode="min_fp", min_tpr= 0.85, max_f
         if mode =="min_fp":
             # find min FP/TP with TPR inside range
             df= df.loc[threshold_results["TPR"]>min_tpr]
-            df = df.iloc[df["FP/TP"].argmin()]
+            if len(df) == 0:
+                df= df.iloc[threshold_results["TPR"].argmax()]
+            else:
+                df = df.iloc[df["FP/TP"].argmin()]
         elif mode == "max_tpr":
             # find max TPR with FP/TP inside range
             df = df.loc[df["FP/TP"]<max_fp]
-            df= df.iloc[threshold_results["TPR"].argmax()]
+            
+            if len(df) == 0:
+                df= df.iloc[threshold_results["FP/TP"].argmin()]
+            else:
+                df= df.iloc[threshold_results["TPR"].argmax()]
         else:
             df= df.loc[threshold_results["TPR"]>min_tpr]
-            df = df.iloc[df["ratio"].argmax()]
-            
+            if len(df) == 0:
+                df= df.iloc[threshold_results["TPR"].argmax()]
+            else:
+                df = df.iloc[df["ratio"].argmax()]
+                
         best_threshold = best_threshold.append(df)
         thresholds = {}
         for name in best_threshold['dataset'].values:

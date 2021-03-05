@@ -218,7 +218,7 @@ def get_episode_metrics(result, meal_data,days_ls= None):
                 
     
     print("total_meal:",meal_counts, "TP: ", TP, "FP: ", FP, "FN: ", FN)
-    perf['TPR'].append(TP/(TP+FN))
+    perf['TPR'].append(TP/(TP+FN) if (TP+FN)>0 else 0)
     if TP ==0:
         perf['FP/TP'].append(None)
     else:
