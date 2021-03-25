@@ -20,7 +20,7 @@ def cross_validation_metrics(model_arch,balance_ratio,names= ["wenkanw"], fold_n
     time_group_perf = defaultdict(list)
     episode_group_perf = defaultdict(list)
     
-    group_threshold = [0.8,0.3] #{'wenkanw':, 'adam':[0.8,0.3],'lawler':[0.8,0.3], 'shaurya':[0.8,0.3]}
+    group_threshold = [0.8,0.4] 
                 
     model = None
     kf = KFold(n_splits=5, random_state= 1000,shuffle=False)
@@ -164,7 +164,7 @@ def cross_validation_metrics(model_arch,balance_ratio,names= ["wenkanw"], fold_n
                         f1 = f1_score(test_Labels,prediction)
                         precision = precision_score(test_Labels,prediction)
                         # weighted accuracy 2 is computed by (weight*TP +TN)/(weight*(TP+FN) + (TN+FP))
-                        wacc2 = weight_accuracy(test_Labels,prediction,weight = balance_ratio,print_flag=False)
+                        wacc2 = weight_accuracy(test_Labels,prediction,weight = balance_ratio[name],print_flag=False)
                         
                         # store performance for one fold 
                         if suffix == "GroupModel":

@@ -1,8 +1,6 @@
-
+from __future__ import print_function
 from packages import *
 
-
-from __future__ import print_function
 from ipywidgets import interact, interactive, fixed, interact_manual
 import ipywidgets as widgets
 import warnings
@@ -121,7 +119,9 @@ def get_episode_output(names= [], threshold= None, use_group_model= False,load_p
     """
     output_df = {"dataset":[],"proba_ls":[],"labels_ls":[],"preds_ls":[]}
     if not threshold:
-        threshold = {'wenkanw':[0.8, 0.3], 'adam':[0.8,0.3],'lawler':[0.8,0.3], 'shaurya':[0.8,0.3]}
+        threshold = {}
+        for name in names:
+            threshold[name] = [0.8,0.4]
     for person in names:
         output_df["dataset"].append(person)
         meal_data = Person_MealsDataset(person_name= person, file_name = "all_files_list", winmin = 6,stridesec = 5,smooth_flag = 1,
@@ -156,7 +156,7 @@ def generate_possibility(dataset,fold_num=5):
     for fold, (day_train_idx, day_test_idx) in enumerate(kf.split(days)):
         day_test_idx = day_test_idx.tolist()
         proba_path ="../results/possibility_results/{}/cv_fold_{}_".format(dataset.person_name,fold)
-        partial_result = hysteresis_threshold(None, dataset,days_ls = day_test_idx,start_threshold=0.8, end_threshold=0.3,
+        partial_result = hysteresis_threshold(None, dataset,days_ls = day_test_idx,start_threshold=0.8, end_threshold=0.4,
                                                   winmin = 6, stepsec=5, episode_min = 1.,
                                                  load_proba_flag=True, path =proba_path)
         #print(partial_result)

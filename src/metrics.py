@@ -168,7 +168,10 @@ def print_time_metrics(result, old_result = None,round_decimal = 3,):
 ##########################
 # Episode metric
 ##########################
-hythreshold = {'wenkanw':[0.8, 0.3], 'adam':[0.8,0.3],'lawler':[0.8,0.3], 'shaurya':[0.8,0.3]}
+
+hythreshold = {}
+for n in ['wenkanw','adam','lawler','shaurya']:
+    hythreshold[n]= [0.8, 0.4]
 def test_models_episode_metric(winmin=6, stridesec = 5,names= ["wenkanw"],random_seed=1000,
                                test_balance=False, test_CAD=False,
                                test_alldata=False,threshold= hythreshold,
@@ -180,7 +183,7 @@ def test_models_episode_metric(winmin=6, stridesec = 5,names= ["wenkanw"],random
     # Don't test on CAD test set if it is not enabled
     if not test_CAD and "CAD" in names:
         names.remove("CAD")
-    group_threshold = {'wenkanw':[0.8, 0.3], 'adam':[0.8,0.3],'lawler':[0.8,0.3], 'shaurya':[0.8,0.3]}
+    group_threshold = {'wenkanw':[0.8, 0.4], 'adam':[0.8,0.4],'lawler':[0.8,0.4], 'shaurya':[0.8,0.4]}
     for name in names:
         person = name
         # test episode metrics that split dataset by days

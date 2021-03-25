@@ -31,7 +31,7 @@ def load_proba(path):
         labels_ls[i] = labels
     return proba_ls,labels_ls
     
-def hysteresis_threshold(model, data,days_ls = [], start_threshold=0.8, end_threshold=0.3, winmin = 6,
+def hysteresis_threshold(model, data,days_ls = [], start_threshold=0.8, end_threshold=0.4, winmin = 6,
                         stepsec=5, episode_min = 1.,t_pause = 900,load_proba_flag = True,
                          path ="../results/possibility_results/", file_name= None):
     """
