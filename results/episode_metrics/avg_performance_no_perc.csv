@@ -1,0 +1,9 @@
+method,metrics,improvement
+Group Thresholds,TPR,0.063
+Group Thresholds,FP/TP,-0.22
+TPR Method,TPR,0.136
+TPR Method,FP/TP,0.183
+FP/TP Method,TPR,0.071
+FP/TP Method,FP/TP,0.373
+Balance Method,TPR,0.074
+Balance Method,FP/TP,0.509
